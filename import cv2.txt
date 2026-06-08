@@ -1,0 +1,66 @@
+import cv2
+import mediapipe as mp
+import pyautogui
+import math
+
+cap = cv2.VideoCapture(0)
+
+screen_w, screen_h = pyautogui.size()
+
+mp_hands = mp.solutions.hands
+hands = mp_hands.Hands(max_num_hands=1)
+draw = mp.solutions.drawing_utils
+
+def distance(p1, p2):
+    return math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2)
+
+while True:
+    success, frame = cap.read()
+    if not success:
+        break
+
+    frame = cv2.flip(frame, 1)
+
+    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    result = hands.process(rgb)
+
+    h, w, _ = frame.shape
+
+    if result.multi_hand_landmarks:
+        for hand in result.multi_hand_landmarks:
+
+            # landmarks
+            index_tip = hand.landmark[8]
+            middle_tip = hand.landmark[12]
+            thumb_tip = hand.landmark[4]
+
+            # cursor movement (index finger)
+            x = int(index_tip.x * w)
+            y = int(index_tip.y * h)
+
+            screen_x = screen_w / w * x
+            screen_y = screen_h / h * y
+
+            pyautogui.moveTo(screen_x, screen_y)
+
+            # distances
+            pinch = distance(index_tip, thumb_tip)
+            two_finger = distance(index_tip, middle_tip)
+
+            # LEFT CLICK (thumb + index)
+            if pinch < 0.03:
+                pyautogui.click()
+
+            # RIGHT CLICK (index + middle finger)
+            if two_finger < 0.03:
+                pyautogui.rightClick()
+
+            draw.draw_landmarks(frame, hand, mp_hands.HAND_CONNECTIONS)
+
+    cv2.imshow("Hand Control", frame)
+
+    if cv2.waitKey(1) == 27:  # ESC to exit
+        break
+
+cap.release()
+cv2.destroyAllWindows()
